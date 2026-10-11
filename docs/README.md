@@ -30,6 +30,14 @@ names) run perfectly on MCV.
 
 **Total: ~12,800 lines of audit documentation.**
 
+## Translation Layer (built on this audit)
+
+| Document | Contents |
+|----------|----------|
+| [translation-layer-spec.md](translation-layer-spec.md) | The MCVPort design: architecture, the two-homes rule, `MCV.Define` schema, animation role catalogue, synthetic timeline events, hook policies, what is deliberately not duplicated |
+| [`../lua/`](../lua) | The runtime — `mcvport_gun` base, role bridges, event scanner, hook runner, `mcvport_report` |
+| [`../templates/`](../templates) | Port templates: pistol, assault rifle, shotgun, sniper, bolt-action, sounds |
+
 ## Architecture at a Glance
 
 ```

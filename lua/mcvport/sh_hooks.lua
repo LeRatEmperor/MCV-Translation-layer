@@ -1,7 +1,7 @@
 --[[---------------------------------------------------------------------------
     MCVPort — the hook runner.
 
-    Port of DHRB's integration system (reference/dhrb/integrations.lua) with the
+    Port of DHRB's integration system (reference/dhrb/dhr/integrations.lua) with the
     same three dispatch policies:
 
         check    -> any false return vetoes the action (CanFire, CanReload...)

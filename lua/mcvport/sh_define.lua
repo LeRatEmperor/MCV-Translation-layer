@@ -1,7 +1,7 @@
 --[[---------------------------------------------------------------------------
     MCVPort — MCV.Define: the port declaration entry point.
 
-    Mirrors DHR.Define (reference/dhrb/core.lua:70-119): deep-merge over
+    Mirrors DHR.Define (reference/dhrb/dhr/core.lua:70-119): deep-merge over
     defaults, eager structural validation with precise messages, marker flags.
     A port weapon file ends with:
 

@@ -19,7 +19,7 @@
       the audited "check -> play -> tolerate nil" pattern (a missing animation
       must never stall or error the fire loop).
     - MCVP.Resolve walks every role against the real viewmodel at deploy and
-      caches per model path, DHRB style (reference/dhrb/core.lua:174-246): one
+      caches per model path, DHRB style (reference/dhrb/dhr/core.lua:174-246): one
       warning listing ALL missing roles at once, instead of a drip of
       "INVALID ACT" spam. Missing roles degrade gracefully — the weapon still
       deploys and fires.

@@ -4,7 +4,7 @@ How SWEPs written for other bases get ported onto the MCV base. This document
 is the design contract for the layer in `lua/` and the templates in
 `templates/`; the behaviour it builds on is cited from the audits in this
 folder. Organizational model: Dandy's Hellraiser Base's `DHR.Define`
-(`reference/dhrb/core.lua`), used as the example, not ported.
+(`reference/dhrb/dhr/core.lua`), used as the example, not ported.
 
 ---
 
@@ -76,7 +76,7 @@ Load guards: `sh_mcvport_init.lua` refuses to overwrite an existing
 
 ## 3. `MCV.Define(weapon, config)`
 
-Mirrors `DHR.Define` (`reference/dhrb/core.lua:70-119`): deep-merge over
+Mirrors `DHR.Define` (`reference/dhrb/dhr/core.lua:70-119`): deep-merge over
 defaults, eager structural validation with precise messages, marker flags.
 
 ```lua
@@ -224,7 +224,7 @@ resort, not the default.
 
 ## 6. Hooks — custom mechanics
 
-Port of DHRB's integration system (`reference/dhrb/integrations.lua`) with its
+Port of DHRB's integration system (`reference/dhrb/dhr/integrations.lua`) with its
 three dispatch policies:
 
 | Policy | Meaning | Hooks |

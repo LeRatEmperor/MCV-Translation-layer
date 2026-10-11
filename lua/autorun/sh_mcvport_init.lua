@@ -12,7 +12,7 @@
     bases, where the global SWEP is the base being defined.
 
     Organization modelled on Dandy's Hellraiser Base's DHR.Define
-    (reference/dhrb/core.lua) — see docs/translation-layer-spec.md.
+    (reference/dhrb/dhr/core.lua) — see docs/translation-layer-spec.md.
 -----------------------------------------------------------------------------]]
 
 if SERVER then

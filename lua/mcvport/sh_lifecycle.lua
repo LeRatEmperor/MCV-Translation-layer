@@ -13,7 +13,7 @@
       tables index by index rather than wholesale, so class-level tables must
       be copied before any instance mutates them (same lesson as
       weapon_common's Primary/Secondary copies and DHRB's self.HR copy,
-      reference/dhrb/dhr_base.lua:128-134).
+      reference/dhrb/weapons/dhr_base.lua:128-134).
     - Deploy: resolve roles and warn once (complete missing list), let a
       CanDeploy hook veto, then run the base deploy.
     - Think: synthetic events and OnThink BEFORE the base think, so an

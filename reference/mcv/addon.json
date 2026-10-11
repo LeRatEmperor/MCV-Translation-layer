@@ -1,0 +1,6 @@
+{
+  "title": "Military Conflict: Vietnam - Part 1: Eastern & Base",
+  "type": "weapon",
+  "tags": ["realism", "fun"],
+  "ignore": ["work/*", "licenses/*", "*.md", "*.py", "vietnam_sounds_physics.txt", ".git/*", ".git*", "icon*.png", "icon*.jpg", "models/*.sw.vtx", "models/*.360.vtx", "models/*.xbox.vtx", "lua/mcv_harness/*", "lua/autorun/sh_mcv_harness.lua"]
+}

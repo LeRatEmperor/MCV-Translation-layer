@@ -86,6 +86,9 @@ MCV.Define(SWEP, {
     hooks    = { ... },   -- custom mechanics (section 6)
     required = { "idle", "draw", "fire" },
     act_roles = { [ACT_] = "role" },  -- extra activity->role bindings
+    attachments = { muzzle = "1", eject = "2" }, -- this model's port names
+    movement = true,      -- discrete walk/sprint bridge (section 7.1)
+    foley    = "qc",     -- "qc" | "synthetic" (section 7.2)
     base     = "mcvport_gun",
 })
 ```
@@ -254,11 +257,65 @@ draw animation already goes through the bridge).
 
 ---
 
-## 7. The gun port base
+## 7. Foreign-model bridges
 
-`mcvport_gun` derives from `mcv_base` and adds exactly the three method
-modules. Everything else — fire pipeline, ballistics, penetration, reload
-state machines, sights/scopes, NPC support, prediction — is inherited.
+Discrete animsets (NMRiH, INS2-style: named Walk/Sprint sequences, HL2-numbered
+attachments, QC-baked 5004 foley) need three more translations than
+activity-mapped models do. Both modules ride seams the audit identified; both
+are opt-in per port and inert without their config.
+
+### 7.1 Discrete movement (`sh_movement.lua`, `movement = true`)
+
+MCV's movement is pose-parameter driven — one idle sequence keeps playing
+while `player_movement` blends walk/sprint layers. A model without those pose
+parameters no-ops into still idle while the player runs. The bridge rides the
+idle loop instead of fighting it: `Idle()` gives `IdleSequence()` precedence
+(sh_anim.lua:119-129) and re-triggers whenever `GetNextIdle()` lapses
+(sh_think.lua:21-23), so the bridge's `IdleSequence` override simply returns the
+sequence matching the movement state — `idle` / `walk` / `sprint`, each with an
+`_empty` variant when the gun is dry (falling back to the base role when the
+model lacks it). The model's own `fadein 0.2` blends every swap.
+
+`ThinkMovement` (lifecycle Think, before the base) handles state *changes*:
+entering or leaving the sprint carry plays the model's transition sequence
+(`sprint_in`/`sprint_out`, i.e. NMRiH's Idle_to_Sprint / Sprint_to_Idle) when
+one is bound, otherwise re-arms the idle loop (`SetNextIdle(0)`) so `Idle()`
+picks the new state on the same think. State changes never cut an in-flight
+action animation: they only act when the current viewmodel sequence belongs
+to the port's movement family; a change mid-fire or mid-reload lands when that
+animation's own NextIdle lapses — exactly how the base already recovers.
+Sighting defers to MCV's vector ironsights (state reads nil); the ironsequence
+contract (Idle_Iron etc.) stays unbound as a future tier. Sighting while
+walking, sprint-toggling, prediction and singleplayer all follow the base's
+own clocks because the bridge only ever answers "what should the idle be".
+
+### 7.2 FX and foley (`sh_fxbridge.lua`, `attachments` + `foley`)
+
+- **Attachments**: foreign models name their ports "1" (muzzle) and "2"
+  (ejection) per the HL2 convention; MCV's `DoEject`/`DoMuzzle` resolve
+  "eject"/"muzzle" internally. `DoEject` takes the attachment name as a
+  parameter (sh_effects.lua:92), so the bridge is a pure wrapper injecting the
+  configured default. `DoMuzzle` has no such seam — a gated one-line fork of
+  sh_effects.lua:47-87 (kept in step with upstream), inherited untouched by
+  ports that don't set `attachments.muzzle`.
+- **Engine events**: `SWEP:FireAnimationEvent` runs MCV's handler first (the
+  duals' "eject2"), then returns true — blocking the engine's default — for:
+  NMRiH-style discrete brass (options like `"45acp Eject 140"`, whose engine
+  handler spawns an unresolvable error model in GMod), the engine muzzle
+  flash (AE_MUZZLEFLASH = 21; MCV draws its own), and, in `foley =
+  "synthetic"` mode, the 5004 soundscript events (the port's timed events
+  own the audio instead). In the default `foley = "qc"` mode the 5004 events
+  pass through and the model's own reload foley plays at the QC's exact frame
+  timing whenever its soundscript names resolve.
+
+---
+
+## 8. The gun port base
+
+`mcvport_gun` derives from `mcv_base` and adds exactly the five method
+modules (animroles, events, fxbridge, movement, lifecycle). Everything else
+— fire pipeline, ballistics, penetration, reload state machines, sights/
+scopes, NPC support, prediction — is inherited.
 Notable native fields the templates lean on (full catalogue:
 `docs/weapon-definitions.md` §3):
 
@@ -281,7 +338,7 @@ state for weapons currently held in the world.
 
 ---
 
-## 8. What is deliberately NOT here
+## 9. What is deliberately NOT here
 
 Things DHRB builds that MCV already has natively — duplicating them would be
 upkeep with no payoff (the audit's central lesson):
@@ -297,14 +354,15 @@ upkeep with no payoff (the audit's central lesson):
   (`ViewModelAkimbo` + `HasAkimbo`), not class-composition like DHRB's
   `SingleClass` pair; revisit only if a port genuinely needs it.
 
-And the known honest limit: **no layer conjures MCV model rigs.** Foreign
-viewmodels run in discrete mode — each action plays its sequence; the
-continuous pose-parameter states (blended ironsight, ammo gauge, movement
-layers) need rig-side work the layer detects (`mcvport_report`) but cannot
-fabricate.
+And the known honest limit: **no layer conjures MCV model rigs.** The discrete
+movement bridge (§7.1) now covers walk/sprint sequences, but the continuous
+pose-parameter states — blended ironsight layers, the ammo gauge — still need
+rig-side work the layer detects (`mcvport_report`) but cannot fabricate.
 
-## 9. Future tiers (not built yet)
+## 10. Future tiers (not built yet)
 
+- **Sequence ADS** — binding the NMRiH-style iron sequences (Idle_Iron,
+  Fire_Iron_*, Idle_to_Iron) alongside/instead of MCV's vector ironsights.
 - **Drafting assistant** — after the first few hand-ports establish the real
   field-mapping pain, a disposable script that pre-fills a template from a
   decompiled foreign weapon lua with `-- TODO` markers. Explicitly

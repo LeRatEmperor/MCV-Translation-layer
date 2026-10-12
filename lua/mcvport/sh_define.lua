@@ -128,6 +128,10 @@ MCVP.DefaultConfig = {
     hooks    = {},
     required = { "idle", "draw", "fire" },
     act_roles = {},
+    attachments = {},          -- this model's attachment names (muzzle/eject)
+    movement = false,          -- discrete walk/sprint bridge (sh_movement.lua)
+    foley    = "qc",           -- "qc": trust the model's 5004 events (default)
+                               -- "synthetic": block them; the events table owns audio
     base     = "mcvport_gun",
 }
 
@@ -232,9 +236,25 @@ function MCVP.Define(weapon, config)
     if not istable(weapon) then fail("MCV.Define expects a SWEP table") end
     if not istable(config) then fail("MCV.Define expects a configuration table") end
 
-    for _, key in ipairs({ "anims", "events", "hooks", "act_roles", "required" }) do
+    for _, key in ipairs({ "anims", "events", "hooks", "act_roles", "required", "attachments" }) do
         if config[key] ~= nil and not istable(config[key]) then
             fail(key .. " must be a table")
+        end
+    end
+
+    if config.movement ~= nil and not isboolean(config.movement) then
+        fail("movement must be a boolean (see sh_movement.lua)")
+    end
+
+    if config.foley ~= nil and config.foley ~= "qc" and config.foley ~= "synthetic" then
+        fail('foley must be "qc" or "synthetic" (see sh_fxbridge.lua)')
+    end
+
+    if config.attachments ~= nil then
+        for key, value in pairs(config.attachments) do
+            if not isstring(key) or not isstring(value) then
+                fail("attachments entries must be name -> attachment-name strings (e.g. muzzle = \"1\")")
+            end
         end
     end
 

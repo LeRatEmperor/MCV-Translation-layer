@@ -1,12 +1,12 @@
 --[[---------------------------------------------------------------------------
-    MCVPort — Colt M1911 (first live port through the translation layer)
+    MCVPort — Colt M1911 (TFA NMRiH port, revision 2)
 
     PORT OF:    TFA NMRiH "Colt M1911" (base tfa_nmrih_base_fa)
-    SOURCE:     the weapon's shared.lua, received 2026-10-12
+    SOURCE:     the weapon's shared.lua + the decompiled viewmodel QC
+                (v_fa_1911.qc, Crowbar 0.74), received 2026-10-12
     ASSETS:     models/weapons/tfa_nmrih/{v,w}_fa_1911.mdl — copy the models
                 into this addon (or keep the source addon mounted); NO TFA lua
-                is required at runtime. Same for the wavs referenced by
-                lua/autorun/port_sounds_nmrih_1911.lua.
+                is required at runtime.
 
     JUDGMENT CALLS (what future-you reads before touching anything):
 
@@ -27,43 +27,69 @@
         253 m/s (real .45 ACP).
     6.  TFA SequenceRateOverride (reload x1.25, sprint x1.5, holster x1.25)
         DROPPED — the layer plays sequences at 1.0x; per-role rate is a
-        Tier-2 candidate. All event times below assume 1.0x playback.
+        Tier-2 candidate. All QC event times below are frame/fps at 1.0x.
     7.  ViewModelBoneMods dropped (TFA-only system; c-hands are already on via
         weapon_common shared.lua:182, so hands still render). The "MagLite"
-        bone TFA hid needs checking: if a maglite shows on the model, find its
-        bodygroup index and set SWEP.BodyGroups below.
+        bone TFA hid has no bodygroup (the QC's only bodygroup is the whole
+        reference mesh) — if a flashlight shows up on the model, the fix is
+        recompiling the model without it, not lua.
     8.  TFA SafetyPos / InspectPos dropped (no MCV safety/inspect systems; F
-        is bash, like native MCV pistols). BashDamage 25 = template default —
-        TFA set no bash stat.
-    9.  The model HAS Walk / walk_empty / Sprint_* / holster sequences (the
-        TFA file proves it) but MCV expresses movement through pose
-        parameters — a foreign model runs discrete-mode, so no VM walk/sprint
-        anims. Known, accepted limitation (docs/translation-layer-spec.md).
-    10. fire_last is bound name-first ("shoot_empty"): NMRiH models drive the
-        core set by activity (the TFA file's ACT_VM_RELOAD rate overrides prove
-        activity mapping), but NMRiH has no engine activity for the last-round
-        shot. VERIFY after first spawn with `mcvport_report` — if fire_last
-        shows missing, put the real sequence name first in the candidate list.
-    11. Dry-fire: MCV's SoundEmpty / SoundNearlyEmpty slots are currently
-        vestigial upstream (docs/weapon-definitions.md), so a synthetic
-        fire_empty event plays GMod's built-in "Default.ClipEmpty" click to
-        match TFA behavior. Swap to a PORT_1911.Empty script for fidelity.
-    12. Sounds: PORT_1911.* scripts are declared in
-        lua/autorun/port_sounds_nmrih_1911.lua with best-guess NMRiH wav
-        paths — VERIFY them against the decompile. The empty/nearly-empty
-        slots point at MCV's generic pistol clicks (native addon provides).
-    13. View offsets: TFA used VMPos_Additive = false (sighting REPLACES the
+        is bash). The model's "Shove" carries ACT_VM_HITCENTER, so MCV's bash
+        and the "AmmoCheck" fidget (ACT_VM_FIDGET) resolve natively.
+    9.  Walk / sprint animations: SOLVED by the layer's discrete movement
+        bridge (lua/mcvport/sh_movement.lua, movement = true below). The
+        model's full animset is bound by name: Walk/Walk_Empty,
+        Sprint_/Sprint_Empty_ (trailing underscores are as authored), the
+        Idle_to_Sprint / Sprint_to_Idle transitions with their empty
+        variants, and Idle_empty for the slide-back idle. The maglite
+        variants (Walk_flash, *_maglite, Light_On/Off) are ignored — no MCV
+        flashlight system.
+    10. fire_last = "Fire_Last" straight from the QC: MCV requests
+        ACT_VM_SHOOTLAST when firing the last round (sh_shoot.lua:110-111);
+        the model instead maps Fire_Last to ACT_VM_PRIMARYATTACK_EMPTY, so
+        the role binds the sequence name first and the activity as fallback.
+    11. Brass: EjectBrassType 18 (.45 ACP — models/weapons/shells/
+        shell_x45apc.mdl; the full table is MCV.ShellTypes,
+        reference sh_common.lua:82-176). The model's own engine brass event
+        ("45acp Eject 140") spawns an error model in GMod; the fx bridge
+        blocks it and MCV's code-side DoEject lands on the model's eject
+        attachment via the attachments table below. The model's ports are
+        named "1" (muzzle) and "2" (ejection), the HL2 convention.
+    12. Foley mode "qc": the model's sequences carry their own 5004 sound
+        events with exact frame timings (clipout @ 14/30 = 0.47s, clipin @
+        51/30 = 1.70s, SlideBack @ 78/30 = 2.60s, SlideForward @ 84/30 =
+        2.80s). While the soundscripts resolve, they play themselves — no
+        synthetic events needed. If the foley is ever silent (source mod
+        unmounted and wavs not copied), set foley = "synthetic" and enable
+        the commented events block below, which carries the same timings.
+    13. Sounds: SoundSingleShot = "Weapon_1911.Single" — the NMRiH
+        soundscript name, which the TFA NMRiH pack defines (GMod mounts
+        addon scripts/game_sounds + lua sound.Add). This works TODAY with
+        the TFA pack mounted. Severing fully later: copy the 1911 wavs into
+        sound/port/nmrih/1911/, point them at the PORT_1911.* declarations
+        in lua/autorun/port_sounds_nmrih_1911.lua, and swap the slot below.
+        Never declare our own sound.Add under the NMRiH names — a later
+        registration wins and would clobber the pack's working definition.
+    14. View offsets: TFA used VMPos_Additive = false (sighting REPLACES the
         base offset), which matches MCV's CustomPos -> IronsightPos switch, so
-        the vectors carried over 1:1 on the same axes: CustomPos/CustomAng =
-        TFA VMPos/VMAng, IronsightPos/Ang = TFA IronSightsPos/Ang.
-        IronFOV 80 -> IronsightFov 80. ViewModelFOV 50 is a native MCV field
-        (see mcv_m38_s) — direct copy. Fine-tune alignment in-game.
-    14. Capacity 7+1 (TFA ClipSize 7; NMRiH chambering) -> ClipSize 7,
+        the vectors carried over 1:1 on the same axes. IronFOV 80 ->
+        IronsightFov 80. ViewModelFOV 50 is a native MCV field (mcv_m38_s).
+        Fine-tune alignment in-game.
+    15. Capacity 7+1 (TFA ClipSize 7; NMRiH chambering) -> ClipSize 7,
         Chamber 1, DefaultClip 21 (three magazines, as TFA shipped it).
-    15. Sequences fire on it: Reload timings (MagOut/MagIn/SlideRelease
-        events) are estimates. Run `mcvport_report` in game, read the resolved
-        reload / reload_empty durations, and set the event t values + the
-        Mag*Time fields to match. Fixing = editing six numbers.
+    16. Reload timings from the QC (fps 30): MagOutTime 0.47, MagInTime
+        1.70 — both flat fields drive MCV's counter pose params; the ammo
+        itself transfers at animation end (audit: non-shotgun mags transfer
+        once at anim end).
+    17. The iron-sight sequences (Idle_Iron, Fire_Iron_*, Idle_to_Iron...) exist
+        on the model but are NOT bound: MCV's vector ironsights own the sight
+        pose, exactly as TFA drove this model. Binding them is a Tier-2 idea.
+        Draw_first (slide rack on first deploy) is likewise unbound — MCV has
+        no first-draw concept. The suicide sequence set is ignored.
+    18. Third-person reload sound left empty — NMRiH's foley is viewmodel
+        only (CHAN on the VM), and MCV's foley bank has no 1911. Silent
+        rather than wrong-caliber noise; borrow an MCV generic later if it
+        bothers.
 -----------------------------------------------------------------------------]]
 
 AddCSLuaFile()
@@ -89,7 +115,7 @@ SWEP.ViewModel = "models/weapons/tfa_nmrih/v_fa_1911.mdl"
 SWEP.WorldModel = "models/weapons/tfa_nmrih/w_fa_1911.mdl"
 SWEP.ViewModelFOV = 50
 
-SWEP.BodyGroups = "" -- TODO judgment call 7: hide the MagLite here if it renders
+SWEP.BodyGroups = ""
 
 -- Stats
 
@@ -107,17 +133,15 @@ SWEP.Firemodes = {
     MCV.FIREMODE_SEMI
 }
 
-SWEP.LastShotAnimation = true -- shoot_empty: slide locks on the last round
+SWEP.LastShotAnimation = true -- Fire_Last: slide locks back on the last round
 
--- Reload timings: mag swap with slide release when empty. TODO judgment call
--- 15: verify against the resolved sequence durations from mcvport_report.
-SWEP.MagInTime = 1.8
-SWEP.MagInTimeEmpty = 2.3
-SWEP.MagOutTime = 0.7
-SWEP.MagOutTimeEmpty = 0.7
+-- Reload timings from the QC (fps 30; judgment call 16)
+SWEP.MagInTime = 1.7
+SWEP.MagInTimeEmpty = 1.7
+SWEP.MagOutTime = 0.47
+SWEP.MagOutTimeEmpty = 0.47
 
--- View slide from recoil (judgment call 3; cosmetic on foreign models,
--- live values if the model is ever MCV-rigged)
+-- View slide from recoil (judgment call 3)
 SWEP.ViewSlideRecoilUp = 1.9
 SWEP.ViewSlideRecoilRight = 0.75
 
@@ -144,7 +168,7 @@ SWEP.ScopeMaterial = NULL
 SWEP.ScopeFOV = 8
 SWEP.ScopeFOV2 = 4
 
-SWEP.IronsightPos = Vector(-2.53, -1, 1.08) -- judgment call 13
+SWEP.IronsightPos = Vector(-2.53, -1, 1.08) -- judgment call 14
 SWEP.IronsightAng = Angle(0.419, 0.025, 0)
 
 SWEP.CustomPos = Vector(1.5, 0, -1)
@@ -180,7 +204,7 @@ SWEP.HasBayonet = false
 SWEP.HasBipod = false
 SWEP.HasRifleGrenade = false
 
-SWEP.BashDamage = 25 -- judgment call 8
+SWEP.BashDamage = 25
 
 -- Penetration (MCV pistol set, cz52-calibrated)
 SWEP.MetalPenetrationDepth = 6
@@ -195,12 +219,11 @@ SWEP.ConcreteDamageModifier = 1.85
 SWEP.WoodDamageModifier = 1.35
 SWEP.OtherDamageModifier = 1.35
 
--- Sound (identity sounds declared in lua/autorun/port_sounds_nmrih_1911.lua;
--- empty clicks borrow MCV's generic pistol set — judgment call 12)
-SWEP.SoundSingleShot = "PORT_1911.Single"
+-- Sound (judgment calls 12-13, 18)
+SWEP.SoundSingleShot = "Weapon_1911.Single" -- NMRiH script; TFA pack defines it
 SWEP.SoundDoubleShot = ""
 SWEP.SoundReload = ""
-SWEP.SoundReloadThirdPerson = "" -- reload foley is the timed events below
+SWEP.SoundReloadThirdPerson = ""
 SWEP.SoundSpecial1 = ""
 SWEP.SoundSpecial2 = ""
 SWEP.SoundNearlyEmpty = "MCV_Weapon_Generic.NearlyEmptyClick_Pistol"
@@ -213,7 +236,7 @@ SWEP.MuzzleParticleIronsighted = "vietnam_muzzleflash_pistol_type3_fp_is"
 SWEP.MuzzleParticleIronsightedSmoke = "vietnam_muzzleflash_pistol_type1_fp_is_smoke"
 SWEP.MuzzleParticle3rdPerson = "vietnam_muzzleflash_pistol_type3_tp"
 
-SWEP.EjectBrassType = 5
+SWEP.EjectBrassType = 18 -- .45 ACP (judgment call 11)
 SWEP.EjectBrassTrail = "vietnam_weaponeffect_shelleject_trail"
 SWEP.EjectBrassParticle = "vietnam_weaponeffect_shelleject_side"
 
@@ -228,38 +251,64 @@ SWEP.TracerFrequency = 2
 --------------------------------------------------------------------------------
 
 MCV.Define(SWEP, {
-    -- Activity-first where the NMRiH model is activity-mapped (proven by the
-    -- TFA file's ACT_VM_RELOAD rate overrides); name-first where NMRiH never
-    -- had an engine activity. Judgment call 10: verify with mcvport_report.
+    -- Every binding below is the decompiled QC's own sequence/activity pair;
+    -- activity-first where the model is activity-mapped (the NMRiH animset is
+    -- fully mapped), name-first for the activities GMod's enum doesn't carry
+    -- (the _EMPTY family, WALK/SPRINT, DRYFIRE).
     anims = {
-        idle         = { ACT_VM_IDLE, "idle" },
-        draw         = { ACT_VM_DRAW, "draw" },
-        holster      = { "holster", ACT_VM_HOLSTER }, -- seq name proven by TFA
-        fire         = { ACT_VM_PRIMARYATTACK, "shoot" },
-        fire_last    = { "shoot_empty", ACT_VM_SHOOTLAST },
-        fire_empty   = { "dryfire", "dry_fire" },
-        reload       = { ACT_VM_RELOAD, "reload" },
-        reload_empty = { ACT_VM_RELOAD_EMPTY, "reload_empty" },
+        idle           = ACT_VM_IDLE,          -- "Idle"
+        idle_empty     = "Idle_empty",         -- slide locked back
+        draw           = ACT_VM_DRAW,          -- "Draw"
+        holster        = ACT_VM_HOLSTER,       -- "Holster"
+        fire           = ACT_VM_PRIMARYATTACK, -- "Fire"
+        fire_last      = { "Fire_Last", ACT_VM_PRIMARYATTACK_EMPTY },
+        fire_empty     = "Fire_Empty",         -- dry-fire click (ACT_VM_DRYFIRE)
+        reload         = ACT_VM_RELOAD,        -- "Reload"
+        reload_empty   = ACT_VM_RELOAD_EMPTY,  -- "Reload_Dry"
+        -- bash ("Shove", ACT_VM_HITCENTER) and fidget ("AmmoCheck",
+        -- ACT_VM_FIDGET) resolve natively through the default activities
+
+        -- discrete movement set (judgment call 9)
+        walk             = "Walk",
+        walk_empty       = "Walk_Empty",
+        sprint           = "Sprint_",           -- trailing underscore, as authored
+        sprint_empty     = "Sprint_Empty_",
+        sprint_in        = "Idle_to_Sprint",
+        sprint_in_empty  = "Idle_to_Sprint_Empty",
+        sprint_out       = "Sprint_to_Idle",
+        sprint_out_empty = "Sprint_to_Idle_Empty",
     },
 
-    -- First-person reload foley + the dry-fire click (NMRiH models carry no
-    -- usable event tracks for these). t = seconds after the animation starts.
-    -- TODO judgment call 15: these are estimates — read the resolved durations
-    -- from `mcvport_report` and correct them.
-    events = {
-        reload = {
-            { t = 0.7, sound = "PORT_1911.MagOut" },
-            { t = 1.8, sound = "PORT_1911.MagIn" },
-        },
-        reload_empty = {
-            { t = 0.7, sound = "PORT_1911.MagOut" },
-            { t = 1.8, sound = "PORT_1911.MagIn" },
-            { t = 2.3, sound = "PORT_1911.SlideRelease" },
-        },
-        fire_empty = {
-            { t = 0.05, sound = "Default.ClipEmpty" }, -- judgment call 11
-        },
+    -- this model's attachment names: "1" = muzzle, "2" = ejection port
+    -- (HL2 convention; MCV expects "muzzle"/"eject" — judgment call 11)
+    attachments = {
+        muzzle = "1",
+        eject  = "2",
     },
+
+    -- walk/sprint/idle_empty ride the idle loop via sh_movement.lua
+    movement = true,
+
+    -- the model's own 5004 events carry the reload foley with exact timings
+    -- (judgment call 12); switch to "synthetic" + the events block below if
+    -- the soundscripts ever stop resolving
+    foley = "qc",
+
+    -- Synthetic foley fallback — QC frame timings, ready to enable:
+    -- swap foley to "synthetic" above and uncomment. Sound names point at
+    -- the sever-later declarations in port_sounds_nmrih_1911.lua.
+    -- events = {
+    --     reload = {
+    --         { t = 0.47, sound = "PORT_1911.MagOut" },   -- clipout  @ 14/30
+    --         { t = 1.70, sound = "PORT_1911.MagIn" },    -- clipin   @ 51/30
+    --     },
+    --     reload_empty = {
+    --         { t = 0.47, sound = "PORT_1911.MagOut" },   -- clipout  @ 14/30
+    --         { t = 1.70, sound = "PORT_1911.MagIn" },    -- clipin   @ 51/30
+    --         { t = 2.60, sound = "PORT_1911.SlideBack" },   -- @ 78/30
+    --         { t = 2.80, sound = "PORT_1911.SlideForward" }, -- @ 84/30
+    --     },
+    -- },
 
     hooks = {
         -- none needed: everything this weapon does is flat fields + roles

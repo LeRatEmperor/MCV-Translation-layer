@@ -92,6 +92,7 @@ end
 function SWEP:Think()
     if self.MCVP then
         MCVP.ThinkEvents(self)
+        MCVP.ThinkMovement(self)
         MCVP.RunHook(self, "OnThink")
     end
 

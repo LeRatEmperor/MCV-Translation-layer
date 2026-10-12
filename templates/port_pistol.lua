@@ -176,7 +176,10 @@ SWEP.MuzzleParticleIronsighted = "vietnam_muzzleflash_pistol_type3_fp_is"
 SWEP.MuzzleParticleIronsightedSmoke = "vietnam_muzzleflash_pistol_type1_fp_is_smoke"
 SWEP.MuzzleParticle3rdPerson = "vietnam_muzzleflash_pistol_type3_tp"
 
-SWEP.EjectBrassType = 5     -- brass model selector
+SWEP.EjectBrassType = 5     -- brass model selector (MCV.ShellTypes,
+                             -- reference/mcv/lua/mcv/shared/sh_common.lua:82-176:
+                             -- 5 = 7.62 Tokarev, 12 = 9x19, 18 = .45 ACP, 2 = 12ga ...)
+                             -- pick the model's actual caliber
 SWEP.EjectBrassTrail = "vietnam_weaponeffect_shelleject_trail"
 SWEP.EjectBrassParticle = "vietnam_weaponeffect_shelleject_side"
 
@@ -203,7 +206,35 @@ MCV.Define(SWEP, {
         reload = ACT_VM_RELOAD,
         reload_empty = ACT_VM_RELOADEMPTY,
         -- bash = ACT_VM_HITCENTER,
+
+        -- Discrete animsets (NMRiH / INS2-style models with Walk / Sprint
+        -- sequences instead of MCV's pose parameters) also bind these; check
+        -- the decompiled QC for the real names (often with _empty variants
+        -- and a trailing underscore on sprint loops):
+        -- idle_empty     = "Idle_empty",
+        -- walk           = "Walk",
+        -- walk_empty     = "Walk_Empty",
+        -- sprint         = "Sprint_",
+        -- sprint_in      = "Idle_to_Sprint",
+        -- sprint_out     = "Sprint_to_Idle",
     },
+
+    -- Foreign models name their HL2-convention attachments "1" (muzzle) and
+    -- "2" (ejection port) where MCV expects "muzzle" / "eject". Without
+    -- this the brass and muzzle particle land nowhere (or the engine's own
+    -- brass event spawns an error model, which the fx bridge blocks).
+    -- attachments = { muzzle = "1", eject = "2" },
+
+    -- Opt into the discrete movement bridge above (walk/sprint/idle_empty
+    -- riding the idle loop). Leave false on MCV-rigged models — their
+    -- pose-parameter movement is native and better.
+    -- movement = true,
+
+    -- "qc" (default): the model's own 5004 animation-event foley plays with
+    -- the QC's exact timing while its soundscript names resolve.
+    -- "synthetic": block them; the events table below owns the audio.
+    -- foley = "qc",
+
 
     -- Synthetic timeline events (seconds after the animation starts).
     -- Only for models whose event tracks are missing/unreadable; prefer the

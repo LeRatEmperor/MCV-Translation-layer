@@ -32,4 +32,6 @@ SWEP.Category = "MCV Ports"
 -- includes them needs its own set of methods.
 include("mcvport/sh_animroles.lua")
 include("mcvport/sh_events.lua")
+include("mcvport/sh_fxbridge.lua")
+include("mcvport/sh_movement.lua") -- after sh_animroles: chains onto its IdleSequence
 include("mcvport/sh_lifecycle.lua")
